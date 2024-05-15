@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>profile user</title>
+    <link rel="stylesheet" href="../assets/css/profilepage.css">
+    
+</head>
+<body>
+
+    <div class="card" id="profileCard" style="display: none;">
+        <h1>Welcome to kindnessKettle</h1>
+        <div class="profile-info">
+            <h1 id="name"></h1>
+            <h2 id="email">Your email is:</h2>
+            <!-- Message and button for registration -->
+            <div id="registrationMessage" class="registration-message"></div>
+            <button id="registrationButton" class="registration-button" style="display: none;" onclick="register()">Register</button>
+            <button id="logoutButton" onclick="logout()" class="logout-button">Logout</button>
+        </div>
+    </div>
+    
+    
+    
+</body>
+<script>
+
+let params = {}
+
+let token;  
+
+let regex = /([^&=]+)=([^&]*)/g, m
+
+while(m = regex.exec(location.href))
+{
+    params[decodeURIComponent(m[1])] = decodeURIComponent(m[2])
+}
+
+if(Object.keys(params).length > 0 )
+{
+    localStorage.setItem('authInfo',JSON.stringify(params))
+}
+
+//hide the acccess token
+window.history.pushState({},document.title,"/src/" + "profile.html")
+
+let info = JSON.parse(localStorage.getItem('authInfo'))
+
+console.log(JSON.parse(localStorage.getItem('authInfo')))
+console.log(info['access_token'])
+console.log(info['expires_in'])
+
+fetch("https://www.googleapis.com/oauth2/v3/userinfo",{
+    headers:{
+        "Authorization": `Bearer ${info['access_token']}`
+    }
+})
+.then((data)=> data.json())
+.then((info)=>{
+    console.log(info)
+    document.getElementById('name').innerHTML+= info.name
+    document.getElementById('email').innerHTML+= info.email
+    
+    makeBackendAPICall(info.email);
+})
+
+
+function makeBackendAPICall(email) {
+    console.log(email);
+
+    const payload = {
+        "email": email // Use the provided email parameter
+    };
+
+    fetch("http://52.16.194.174:8085/login/auth", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to authenticate');
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json(); // Parse JSON response
+        } else {
+            return response.text(); // Return plain text response
+        }
+    })
+    .then(data => {
+        console.log(data);
+        if (!data) {
+            console.log("data", data);
+            document.getElementById('profileCard').style.display = 'block';
+            // Display a message and provide a button to register
+            document.getElementById('registrationMessage').innerText = 'You are not registered. Please register to continue.';
+            document.getElementById('registrationButton').style.display = 'block';
+        } else {
+            if (typeof data === 'object') {
+                console.log('Response data:', data);
+                console.log("jwtttoken", data.token);
+                localStorage.setItem('jwttoken', data.token);
+                localStorage.setItem('user_details', JSON.stringify(data.userAccount)); // Store user details as JSON string
+                // Handle the user account data as needed
+                // For example, you can access it using data.userAccount
+                window.location.href = "http://127.0.0.1:5500/home.html";
+            } else {
+                // Handle plain text response
+                console.log('Plain text response:', data);
+                // Do something with the plain text data
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error calling backend API:', error);
+    });
+}
+
+
+
+function logout(){
+
+fetch("https://oauth2.googleapis.com/revoke?token=" + info['access_token'],{
+    method:'POST',
+    headers:{
+        'content-type':'application/x-www-form-urlencoded'
+    }
+})
+.then((data)=>{
+    location.href="http://127.0.0.1:5500/landingpage.html"
+})
+}
+   
+</script>
+</html>
